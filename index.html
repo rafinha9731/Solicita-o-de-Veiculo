@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Solicitação de Veículo Oficial – Setor de Protocolo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  body{font-family:Segoe UI,Arial,sans-serif;background:#f0f2f5;margin:0;padding:24px;color:#222}
+  .card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.12);padding:20px;margin-bottom:18px;max-width:980px;margin-inline:auto}
+  h1{font-size:20px;margin:0 0 12px}
+  h2{font-size:15px;margin:0 0 10px;color:#444}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+  th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}
+  th{background:#eef1f5}
+  .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+  .campo label{display:block;font-size:12px;color:#555;margin-bottom:3px}
+  .campo input,.campo textarea,.campo select{width:100%;padding:7px;border:1px solid #bbb;border-radius:6px;box-sizing:border-box;font-size:13px;font-family:inherit}
+  .campo input[type="checkbox"]{width:auto}
+  .campo textarea{resize:vertical}
+  .info{font-size:13px;color:#1a5fb4;background:#eef4ff;border:1px solid #c4d7f5;border-radius:6px;padding:10px}
+  .dica{font-size:11px;color:#888}
+  button{padding:10px 22px;border:none;border-radius:6px;background:#1a5fb4;color:#fff;font-size:14px;cursor:pointer}
+  button:hover{background:#124a8f}
+  button.sec{background:#666}button.sec:hover{background:#4d4d4d}
+  button:disabled{opacity:.6;cursor:wait}
+  .barra{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .feedback{font-size:13px;color:#1a7f37;font-weight:600;opacity:0;transition:opacity .3s}
+  .oculto{display:none}
+  #fbStatus{font-size:12px;font-weight:600;color:#666;margin-left:8px}
+  #fbStatus.ok{color:#1a7f37}
+  #fbStatus.erro{color:#b3261e}
+  #logoStatus{font-size:12px;font-weight:600;color:#1a7f37;margin-top:4px}
+  table.hist td,table.hist th{font-size:12.5px}
+  .acao{padding:4px 10px;font-size:12px}
+  #histTitulo{cursor:pointer;user-select:none}
+  #histTitulo:hover{color:#1a5fb4}
+  #histTitulo .seta{display:inline-block;transition:transform .2s;margin-right:6px;font-size:12px}
+  #histTitulo.aberto .seta{transform:rotate(90deg)}
+  .diasSem{display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
+  .diasSem label{display:flex;align-items:center;gap:5px;cursor:pointer}
+  #prevVeic{font-size:13px;color:#1a7f37;font-weight:600;margin-top:8px}
+</style>
+
+<style id="cssFolha">
+  .pagina{width:794px;height:1123px;background:#fff;position:relative;overflow:hidden;
+          font-family:Arial,Helvetica,sans-serif;font-size:13.5px;line-height:1.35;color:#000;
+          padding:56px 90px 70px;box-sizing:border-box}
+  .logo-ipen{display:flex;justify-content:center;align-items:center;gap:12px;margin-bottom:22px}
+  .logo-ipen .ipen-word{font-size:48px;font-weight:bold;color:#1e2d50;line-height:.9;letter-spacing:-1px}
+  .logo-ipen .ipen-sub{font-size:11.5px;font-weight:bold;color:#1e2d50;line-height:1.15}
+  /* ---- Réplica: Solicitação de Veículo Oficial ---- */
+  .pagina.veic{height:auto;min-height:1123px;overflow:visible;font-size:12px;line-height:1.25;
+               padding:30px 48px 34px}
+  .pagina.veic img{height:46px;margin-bottom:8px;display:block;margin-inline:auto}
+  .pagina.veic .logo-ipen{margin-bottom:10px}
+  .pagina.veic .logo-ipen .ipen-word{font-size:38px}
+  .pagina.veic .logo-ipen .ipen-sub{font-size:9.5px}
+  .tituloCaixa{border:1.4px solid #000;text-align:center;font-weight:bold;font-size:15px;padding:6px;margin-bottom:14px}
+  .vsec{font-weight:bold;margin:9px 0 4px}
+  table.vt{width:100%;border-collapse:collapse;table-layout:fixed}
+  table.vt td{border:1.4px solid #000;padding:3px 6px;vertical-align:top}
+  .vrot{font-weight:bold;font-size:11px}
+  .vval{min-height:15px;margin-top:2px}
+  .vcaixa{border:1.4px solid #000;padding:4px 7px;white-space:pre-wrap;min-height:24px}
+  .vlinha{border:1.4px solid #000;min-height:22px;margin-top:-1.4px;padding:3px 7px;white-space:pre-wrap}
+  .vassina td{height:50px}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>🚗 Solicitação de Veículo Oficial</h1>
+  <div class="info" style="margin-bottom:14px">
+    ℹ O sistema gera <b>um formulário por data</b> (numeração sequencial a partir do "Próximo nº").
+    Escolha os <b>dias da semana</b> + mês/ano <u>ou</u> marque <b>Usar data específica</b> — ao marcar,
+    os dias da semana e o mês/ano são desabilitados automaticamente.
+    <b>Fixos:</b> Solicitante e Área/Centro = SETOR DE PROTOCOLO • Ramal = 5551 •
+    Endereço = CAMPUS CNEN - IPEN , USP • Justificativa = REALIZAR SERVIÇOS DO SETOR DE PROTOCOLO INSTITUCIONAL •
+    Marcação = Serviço Interno e Externo • Tipo = Passageiro
+    (os campos Endereço, Justificativa e Tipo têm caixa <b>Editar</b> para os casos excepcionais).
+    <b>Data</b> e <b>Hora</b> do formulário repetem a Dt/Hr de Partida •
+    <b>Prioridade e Viagem</b> ficam em branco •
+    Seções 6, 7, 8, quadros de aprovação e assinaturas finais vão em branco para o Setor de Transporte.
+    <b>Ao baixar o PDF, cada solicitação é salva automaticamente no Firebase</b> e aparece no histórico abaixo.
+  </div>
+
+  <div class="grade" style="margin-bottom:6px">
+    <div class="campo" style="grid-column:1/-1">
+      <label>Logomarca oficial — importação única (fica salva neste navegador)</label>
+      <input type="file" id="logoArquivo" accept=".png,.jpg,.jpeg">
+      <div id="logoStatus"></div>
+    </div>
+  </div>
+
+  <h2>1. Numeração e datas</h2>
+  <div class="grade">
+    <div class="campo"><label>Próximo nº do formulário</label><input id="vNum" value="001"></div>
+    <div class="campo" style="grid-column:span 2"><label>Dias da semana (marque todos que gerarão formulário)</label>
+      <div class="diasSem">
+        <label><input type="checkbox" class="vDia" value="1"> Segunda</label>
+        <label><input type="checkbox" class="vDia" value="2"> Terça</label>
+        <label><input type="checkbox" class="vDia" value="3"> Quarta</label>
+        <label><input type="checkbox" class="vDia" value="4"> Quinta</label>
+        <label><input type="checkbox" class="vDia" value="5"> Sexta</label>
+        <label><input type="checkbox" class="vDia" value="6"> Sábado</label>
+        <label><input type="checkbox" class="vDia" value="0"> Domingo</label>
+      </div>
+    </div>
+    <div class="campo"><label>Mês</label>
+      <select id="vMes">
+        <option>Janeiro</option><option>Fevereiro</option><option>Março</option><option>Abril</option>
+        <option>Maio</option><option>Junho</option><option>Julho</option><option>Agosto</option>
+        <option>Setembro</option><option>Outubro</option><option>Novembro</option><option>Dezembro</option>
+      </select>
+    </div>
+    <div class="campo"><label>Ano</label><input id="vAno" type="number"></div>
+    <div class="campo" style="grid-column:span 2">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:5px">
+        <input type="checkbox" id="vUsarDataEsp"> Usar data específica (desabilita os dias da semana)
+      </label>
+      <input type="date" id="vDataEsp" disabled>
+    </div>
+  </div>
+  <div id="prevVeic"></div>
+
+  <h2 style="margin-top:16px">2. Dados da solicitação</h2>
+  <div class="grade">
+    <div class="campo">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <label style="margin:0">Tipo</label>
+        <label style="margin:0;display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="vTipoEdit"> Editar
+        </label>
+      </div>
+      <input id="vTipo" value="Passageiro" disabled>
+    </div>
+    <div class="campo"><label>Hr de Partida</label><input id="vHrPart" placeholder="Ex: 13:30"></div>
+    <div class="campo"><label>Hr de Retorno</label><input id="vHrRet" placeholder="Ex: 17:00"></div>
+  </div>
+
+  <h2 style="margin-top:16px">3. Conteúdo da solicitação</h2>
+  <div class="grade">
+    <div class="campo" style="grid-column:1/-1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <label style="margin:0">2 – Endereço Completo</label>
+        <label style="margin:0;display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="vEndEdit"> Editar (outra localidade)
+        </label>
+      </div>
+      <textarea id="vEndereco" rows="2" disabled>CAMPUS CNEN - IPEN , USP</textarea>
+    </div>
+    <div class="campo" style="grid-column:1/-1"><label>4 – Informações Complementares (opcional)</label><textarea id="vCompl" rows="2"></textarea></div>
+    <div class="campo" style="grid-column:1/-1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <label style="margin:0">5 – Justificativa</label>
+        <label style="margin:0;display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="vJustEdit"> Editar (outra necessidade)
+        </label>
+      </div>
+      <textarea id="vJustif" rows="2" disabled>REALIZAR SERVIÇOS DO SETOR DE PROTOCOLO INSTITUCIONAL</textarea>
+    </div>
+  </div>
+  <div class="dica" style="margin-top:8px">
+    Ficam em branco por padrão: <b>3 – Passageiros</b>, Prioridade e Viagem.
+    As seções <b>6 – Dados do Transporte</b>, <b>7 – Observações do Motorista</b> e <b>8 – Endereços Percorridos</b>,
+    os quadros de aprovação e as assinaturas finais vão em branco no formulário — preenchimento do Setor de Transporte.
+  </div>
+</div>
+
+<div class="card">
+  <h2>Documento</h2>
+  <div class="barra" style="margin-top:0">
+    <button id="btnVeicVer">👁 Visualizar formulários</button>
+    <button id="btnVeicPDF">⬇ Baixar PDF (salva no Firebase)</button>
+    <span id="fbVeic" class="feedback"></span>
+    <span class="dica">A visualização mostra os números previstos; o download confirma, avança a numeração e salva no histórico.</span>
+  </div>
+</div>
+
+<div class="card">
+  <h2 id="histTitulo"><span class="seta">▶</span>☁️ Histórico de solicitações salvas <span id="fbStatus">Conectando ao Firebase…</span></h2>
+  <div id="histConteudo" class="oculto">
+    <div class="barra" style="margin-top:0">
+      <button class="sec acao" id="btnAtualizarHist">↻ Atualizar</button>
+      <span class="dica">Use "👁 Visualizar" para conferir ou imprimir sem baixar, e "📄 Gerar PDF" para baixar novamente (não avança a numeração).</span>
+    </div>
+    <div style="max-height:320px;overflow:auto">
+      <table class="hist">
+        <thead><tr><th>Ações</th><th>Nº</th><th>Data(s)</th><th>Justificativa</th><th>Salvo em</th></tr></thead>
+        <tbody id="corpoHist"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Réplica do documento (invisível) usada para gerar os PDFs -->
+<div id="docPdf" style="position:absolute;left:-10000px;top:0"></div>
+
+<script>
+/* =========================================================
+   CONFIG FIREBASE — projeto: gerador-geral-ipen (mesmo do sistema de termos)
+   ========================================================= */
+const firebaseConfig = {
+  apiKey:            "AIzaSyBdsZ1sI1rpSPae_PnkpRFpS8fSnrqf-Lk",
+  authDomain:        "gerador-geral-ipen.firebaseapp.com",
+  projectId:         "gerador-geral-ipen",
+  storageBucket:     "gerador-geral-ipen.firebasestorage.app",
+  messagingSenderId: "1061778240436",
+  appId:             "1:1061778240436:web:41b55d8c50f98e324138e1",
+  measurementId:     "G-X1GQJ2EL2W"
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const tv = id => $(id).value.trim();
+
+/* =========================================================
+   FIREBASE — init e status
+   ========================================================= */
+let fb = null;
+
+function statusFB(txt, classe){
+  const el = $("fbStatus");
+  el.textContent = txt;
+  el.className = classe || "";
+}
+
+function initFirebase(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    fb = { db: firebase.firestore() };
+    firebase.auth().signInAnonymously()
+      .then(() => { statusFB("✔ Conectado", "ok"); carregarHistorico(); })
+      .catch(err => {
+        if(err.code === "auth/operation-not-allowed")
+          statusFB("⚠ Ative 'Anônimo' em Authentication → Sign-in method", "erro");
+        else
+          statusFB("⚠ Firebase: " + err.code, "erro");
+      });
+  }catch(err){
+    statusFB("⚠ Erro no Firebase: " + err.message, "erro");
+  }
+}
+initFirebase();
+
+const precisaFB = () => !fb || !firebase.auth().currentUser;
+
+function fmtDataTs(ts){
+  if(!ts || !ts.toDate) return "—";
+  return ts.toDate().toLocaleString("pt-BR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+
+async function salvarSolicitacaoFB(numStr, numInt, dataBR, val){
+  if(precisaFB()) throw new Error("Firebase não conectado — verifique a autenticação anônima.");
+  const ref = await fb.db.collection("documentos_gerados").add({
+    tipo: "solicitacao_veiculo",
+    numero: numStr, numeroInt: numInt, dataBR,
+    dados: val,
+    criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  return ref.id;
+}
+
+/* =========================================================
+   HISTÓRICO — recolher/expandir e carregar
+   ========================================================= */
+ $("histTitulo").addEventListener("click", () => {
+  const aberto = $("histConteudo").classList.toggle("oculto");
+  $("histTitulo").classList.toggle("aberto", !aberto);
+});
+function abrirHistorico(){
+  $("histConteudo").classList.remove("oculto");
+  $("histTitulo").classList.add("aberto");
+}
+
+async function carregarHistorico(){
+  if(precisaFB()) return;
+  const tb = $("corpoHist");
+  tb.innerHTML = `<tr><td colspan="5">Carregando…</td></tr>`;
+  try{
+    const snap = await fb.db.collection("documentos_gerados")
+                         .orderBy("criadoEm","desc").limit(300).get();
+    tb.innerHTML = "";
+    let exibidos = 0, maior = 0;
+    snap.forEach(docSnap => {
+      const d = docSnap.data(), id = docSnap.id;
+      if(d.tipo !== "solicitacao_veiculo") return;
+      exibidos++;
+      if(d.numeroInt && d.numeroInt > maior) maior = d.numeroInt;
+      const just = (d.dados && d.dados.justif) || "—";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>
+          <button class="sec acao" data-ver="${id}">👁 Visualizar</button>
+          <button class="sec acao" data-pdf="${id}">📄 Gerar PDF</button>
+          <button class="sec acao" data-excluir="${id}">🗑</button>
+        </td>
+        <td style="font-weight:600">${esc(d.numero||"—")}</td>
+        <td>${esc(d.dataBR||"—")}</td>
+        <td style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(just)}">${esc(just)}</td>
+        <td>${fmtDataTs(d.criadoEm)}</td>`;
+      tr.querySelector("[data-ver]").onclick = () => {
+        abrirVisualizacaoDoc(d.numero, d.dataBR, d.dados || {});
+      };
+      const btnPdf = tr.querySelector("[data-pdf]");
+      btnPdf.onclick = async () => {
+        btnPdf.disabled = true; btnPdf.textContent = "⏳ Gerando…";
+        try{
+          await gerarPdfDoc(d.numero, d.dataBR, d.dados || {});
+        }catch(err){
+          alert("Erro ao gerar o PDF:\n" + err.message);
+        }finally{
+          btnPdf.disabled = false; btnPdf.textContent = "📄 Gerar PDF";
+        }
+      };
+      tr.querySelector("[data-excluir]").onclick = async () => {
+        if(!confirm("Excluir a solicitação nº "+(d.numero||id)+" do Firebase?")) return;
+        try{
+          await fb.db.collection("documentos_gerados").doc(id).delete();
+          carregarHistorico();
+        }catch(err){ alert("Erro ao excluir: " + err.message); }
+      };
+      tb.appendChild(tr);
+    });
+    if(exibidos === 0)
+      tb.innerHTML = `<tr><td colspan="5" style="color:#888">Nenhuma solicitação salva ainda.</td></tr>`;
+    /* sincroniza contador local com o maior nº salvo no Firebase */
+    if(maior >= veicProxNum()){
+      veicSetProxNum(maior + 1);
+      $("vNum").value = String(veicProxNum()).padStart(3,"0");
+      atualizarPreviaVeic();
+    }
+  }catch(err){
+    let msg = err.message;
+    if(err.code === "permission-denied") msg = "Permissão negada — verifique as regras do Firestore e a autenticação anônima.";
+    tb.innerHTML = `<tr><td colspan="5" style="color:#b3261e">Erro ao carregar: ${esc(msg)}</td></tr>`;
+  }
+}
+ $("btnAtualizarHist").onclick = carregarHistorico;
+
+/* =========================================================
+   LOGO — arquivo da pasta quando possível; vetorial como reserva
+   ========================================================= */
+const LOGO_PADRAO = `<div class="logo-ipen">
+  <svg viewBox="0 0 130 100" width="140" height="62">
+    <g transform="rotate(-22 48 50)">
+      <ellipse cx="48" cy="50" rx="44" ry="23" fill="none" stroke="#4aa8e8" stroke-width="8"/>
+      <ellipse cx="45" cy="52" rx="31" ry="15" fill="none" stroke="#1a6bb8" stroke-width="8"/>
+      <ellipse cx="43" cy="53" rx="19" ry="8.5" fill="none" stroke="#0a3a75" stroke-width="7"/>
+      <ellipse cx="42" cy="54" rx="8" ry="3.4" fill="none" stroke="#0a3a75" stroke-width="5.5"/>
+    </g>
+  </svg>
+  <div><div class="ipen-word">ipen</div><div class="ipen-sub">instituto de pesquisas<br>energéticas e nucleares</div></div>
+</div>`;
+
+let logoDataUrl   = null;
+let logoArquivoOk = false;
+
+function statusLogo(txt){ $("logoStatus").textContent = txt; }
+
+function logoAtualHTML(forcarVetorial){
+  if(logoDataUrl && !forcarVetorial)
+    return `<img src="${logoDataUrl}" alt="IPEN">`;
+  if(logoArquivoOk && !forcarVetorial)
+    return `<img src="logo_ipen.png" alt="IPEN">`;
+  return LOGO_PADRAO;
+}
+
+async function initLogo(){
+  try{
+    const salvo = localStorage.getItem("logo_ipen_b64");
+    if(salvo){ logoDataUrl = salvo; statusLogo("✔ Logo oficial em uso (salvo neste navegador)"); return; }
+  }catch(_){}
+  try{
+    const img = await new Promise((ok, falha) => {
+      const i = new Image();
+      i.onload = () => ok(i); i.onerror = () => falha();
+      i.src = "logo_ipen.png";
+    });
+    logoArquivoOk = true;
+    try{
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext("2d").drawImage(img, 0, 0);
+      logoDataUrl = c.toDataURL("image/png");
+      try{ localStorage.setItem("logo_ipen_b64", logoDataUrl); }catch(_){}
+      statusLogo("✔ logo_ipen.png carregado automaticamente da pasta");
+    }catch(_){
+      statusLogo("⚠ logo_ipen.png encontrado, mas o navegador bloqueia o uso dele no PDF. Importe-o uma única vez acima — fica salvo.");
+    }
+  }catch(_){
+    statusLogo("logo_ipen.png não encontrado — usando a reprodução vetorial do logo.");
+  }
+}
+
+ $("logoArquivo").addEventListener("change", e => {
+  const f = e.target.files[0];
+  if(!f) return;
+  const fr = new FileReader();
+  fr.onload = ev => {
+    logoDataUrl = ev.target.result;
+    logoArquivoOk = true;
+    try{ localStorage.setItem("logo_ipen_b64", logoDataUrl); }catch(_){}
+    statusLogo("✔ Logo oficial salvo — será usado automaticamente nos próximos usos.");
+  };
+  fr.readAsDataURL(f);
+});
+
+/* =========================================================
+   NUMERAÇÃO — persistente, sincronizada com o Firebase
+   ========================================================= */
+function veicProxNum(){ return parseInt(localStorage.getItem("veic_prox_num") || "1", 10) || 1; }
+function veicSetProxNum(n){ try{ localStorage.setItem("veic_prox_num", String(n)); }catch(_){} }
+ $("vNum").value = String(veicProxNum()).padStart(3,"0");
+ $("vNum").addEventListener("input", () => {
+  const n = parseInt($("vNum").value.replace(/\D/g,""),10);
+  if(n >= 1) veicSetProxNum(n);
+});
+
+/* mês/ano padrão = atual */
+(() => {
+  const hoje = new Date();
+  $("vMes").selectedIndex = hoje.getMonth();
+  $("vAno").value = hoje.getFullYear();
+})();
+
+/* =========================================================
+   DATAS — dias da semana OU data específica
+   ========================================================= */
+const fmtBR = d => String(d.getDate()).padStart(2,"0") + "/" +
+                   String(d.getMonth()+1).padStart(2,"0") + "/" + d.getFullYear();
+
+function calcularDatasVeic(){
+  if($("vUsarDataEsp").checked){
+    const v = $("vDataEsp").value;               // yyyy-mm-dd
+    if(!v) return [];
+    const [a,m,d] = v.split("-").map(Number);
+    return [new Date(a, m-1, d)];
+  }
+  const dias = [...document.querySelectorAll(".vDia:checked")].map(c => parseInt(c.value,10));
+  if(!dias.length) return [];
+  const mes = $("vMes").selectedIndex + 1;
+  const ano = parseInt($("vAno").value, 10);
+  if(!ano || ano < 2000 || ano > 2100) return [];
+  const datas = [];
+  const d = new Date(ano, mes - 1, 1);
+  while(d.getMonth() === mes - 1){
+    if(dias.includes(d.getDay())) datas.push(new Date(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return datas;
+}
+
+function atualizarPreviaVeic(){
+  const datas = calcularDatasVeic();
+  if(!datas.length){
+    $("prevVeic").textContent = $("vUsarDataEsp").checked
+      ? "Informe a data específica para gerar o formulário."
+      : "Marque ao menos um dia da semana (com ano válido) ou use a data específica.";
+    return;
+  }
+  const base = veicProxNum();
+  const nums = datas.map((_,i) => String(base+i).padStart(3,"0"));
+  $("prevVeic").textContent =
+    `Serão gerados ${datas.length} formulário(s) — nº ${nums[0]} a ${nums[nums.length-1]}` +
+    ` • datas: ${datas.map(fmtBR).join(", ")}`;
+}
+
+/* data específica DESABILITA dias da semana e mês/ano (evita conflito) */
+ $("vUsarDataEsp").addEventListener("change", () => {
+  const esp = $("vUsarDataEsp").checked;
+  $("vDataEsp").disabled = !esp;
+  document.querySelectorAll(".vDia").forEach(c => { c.disabled = esp; if(esp) c.checked = false; });
+  $("vMes").disabled = esp;
+  $("vAno").disabled = esp;
+  atualizarPreviaVeic();
+});
+["change","input"].forEach(ev => {
+  document.querySelectorAll(".vDia, #vMes, #vAno, #vDataEsp, #vNum")
+    .forEach(el => el.addEventListener(ev, atualizarPreviaVeic));
+});
+atualizarPreviaVeic();
+
+/* campos com padrão fixo — a caixa "Editar" libera a digitação */
+ $("vEndEdit").addEventListener("change", () => { $("vEndereco").disabled = !$("vEndEdit").checked; });
+ $("vJustEdit").addEventListener("change", () => { $("vJustif").disabled  = !$("vJustEdit").checked; });
+ $("vTipoEdit").addEventListener("change", () => { $("vTipo").disabled    = !$("vTipoEdit").checked; });
+
+/* =========================================================
+   MONTAGEM DO FORMULÁRIO (réplica fiel — uma página por data)
+   ========================================================= */
+const FIXO_SOLICITANTE = "SETOR DE PROTOCOLO";
+const FIXO_AREA        = "SETOR DE PROTOCOLO";
+const FIXO_RAMAL       = "5551";
+const FIXO_ENDERECO    = "CAMPUS CNEN - IPEN , USP";
+const FIXO_JUSTIF      = "REALIZAR SERVIÇOS DO SETOR DE PROTOCOLO INSTITUCIONAL";
+const FIXO_TIPO        = "Passageiro";
+
+function valoresVeic(){
+  return {
+    tipo:     $("vTipoEdit").checked ? tv("vTipo") : FIXO_TIPO,
+    hrPart:   tv("vHrPart"),
+    hrRet:    tv("vHrRet"),
+    endereco: $("vEndEdit").checked ? tv("vEndereco") : FIXO_ENDERECO,
+    compl:    tv("vCompl"),
+    justif:   $("vJustEdit").checked ? tv("vJustif") : FIXO_JUSTIF
+  };
+}
+
+function montarPaginaVeic(numStr, dataBR, val, forcarVetorial){
+  const logo = logoAtualHTML(forcarVetorial);
+  const e = esc;
+  const linhasBrancas = n => Array.from({length:n}, () => `<div class="vlinha">&nbsp;</div>`).join("");
+  return `<div class="pagina veic">
+  ${logo}
+  <div class="tituloCaixa">Solicitação de Veículo Oficial</div>
+
+  <div class="vsec">1 - Dados do Solicitante</div>
+  <table class="vt">
+    <tr>
+      <td style="width:12%"><span class="vrot">Número:</span><div class="vval">${e(numStr)}</div></td>
+      <td style="width:16%"><span class="vrot">Data:</span><div class="vval">${e(dataBR)}</div></td>
+      <td style="width:12%"><span class="vrot">Hora:</span><div class="vval">${e(val.hrPart)}</div></td>
+      <td style="width:22%"><span class="vrot">Prioridade:</span><div class="vval">&nbsp;</div></td>
+      <td><span class="vrot">Tipo:</span><div class="vval">${e(val.tipo)}</div></td>
+    </tr>
+  </table>
+  <table class="vt" style="margin-top:-1.4px">
+    <tr>
+      <td style="width:24%"><span class="vrot">Solicitante:</span><div class="vval">${e(FIXO_SOLICITANTE)}</div></td>
+      <td style="width:11%"><span class="vrot">Ramal:</span><div class="vval">${e(FIXO_RAMAL)}</div></td>
+      <td><span class="vrot">Área/Centro:</span><div class="vval">${e(FIXO_AREA)}</div></td>
+    </tr>
+  </table>
+  <table class="vt" style="margin-top:-1.4px">
+    <tr>
+      <td style="width:17%">Dt de Partida<div class="vval">${e(dataBR)}</div></td>
+      <td style="width:13%">Hr de Partida<div class="vval">${e(val.hrPart)}</div></td>
+      <td style="width:18%">Dt de Retorno<div class="vval">${e(dataBR)}</div></td>
+      <td style="width:13%">Hr de Retorno<div class="vval">${e(val.hrRet)}</div></td>
+      <td style="width:14%">Serviço<br>Interno e Externo</td>
+      <td>Viagem<div class="vval">&nbsp;</div></td>
+    </tr>
+  </table>
+
+  <div class="vsec">2 - Endereço Completo</div>
+  <div class="vcaixa" style="min-height:36px">${e(val.endereco)}</div>
+
+  <div class="vsec">3 - Passageiros</div>
+  <div class="vcaixa" style="min-height:22px;width:38%">&nbsp;</div>
+
+  <div class="vsec">4 - Informações Complementares</div>
+  <div class="vcaixa" style="min-height:22px">${e(val.compl)}</div>
+
+  <div class="vsec">5 - Justificativa</div>
+  <div class="vcaixa" style="min-height:42px">${e(val.justif)}</div>
+  <table class="vt" style="margin-top:-1.4px">
+    <tr>
+      <td style="height:40px">Aprovado (Gerência)</td>
+      <td style="height:40px">Aprovado (Transportes)</td>
+      <td style="height:40px">Encerrado por (Transportes)</td>
+    </tr>
+  </table>
+
+  <div class="vsec">6 - Dados do Transporte <span style="font-weight:normal;font-size:10.5px">(preenchimento pelo Setor de Transporte)</span></div>
+  <table class="vt">
+    <tr>
+      <td style="width:26%">Condutor<div class="vval">&nbsp;</div></td>
+      <td style="width:24%">Veículo<div class="vval">&nbsp;</div></td>
+      <td style="width:14%">Km Saída<div class="vval">&nbsp;</div></td>
+      <td style="width:16%">Km Chegada<div class="vval">&nbsp;</div></td>
+      <td>Km Percorridos<div class="vval">&nbsp;</div></td>
+    </tr>
+    <tr>
+      <td colspan="2">Próxima troca de óleo<div class="vval">&nbsp;</div></td>
+      <td colspan="3">Próxima troca de correia dentada<div class="vval">&nbsp;</div></td>
+    </tr>
+  </table>
+
+  <div class="vsec">7 - Observações do Motorista</div>
+  ${linhasBrancas(2)}
+
+  <div class="vsec">8 - Endereços Percorridos</div>
+  ${linhasBrancas(3)}
+
+  <table class="vt vassina" style="margin-top:14px">
+    <tr>
+      <td>Hora e Data da Dispensa</td>
+      <td>Assinatura do Passageiro</td>
+      <td>Assinatura do Condutor</td>
+    </tr>
+  </table>
+</div>`;
+}
+
+/* =========================================================
+   PDF — nunca corta: se o conteúdo crescer além de uma folha A4,
+   o canvas é fatiado em mais páginas automaticamente
+   ========================================================= */
+function addCanvasAoPdf(pdf, canvas, primeiraPag){
+  const pw = pdf.internal.pageSize.getWidth();    // 210 mm
+  const ph = pdf.internal.pageSize.getHeight();   // 297 mm
+  const imgH = pw * canvas.height / canvas.width;
+  if(imgH <= ph + 2){
+    if(!primeiraPag) pdf.addPage();
+    pdf.addImage(canvas.toDataURL("image/jpeg",0.92), "JPEG", 0, 0, pw, imgH);
+    return false;
+  }
+  const px = canvas.width / pw;
+  const pageH = Math.floor(ph * px);
+  let y = 0;
+  while(y < canvas.height){
+    const h = Math.min(pageH, canvas.height - y);
+    if(!primeiraPag) pdf.addPage();
+    const c = document.createElement("canvas");
+    c.width = canvas.width; c.height = h;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,c.width,c.height);
+    ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+    pdf.addImage(c.toDataURL("image/jpeg",0.92), "JPEG", 0, 0, pw, h/px);
+    primeiraPag = false;
+    y += h;
+  }
+  return false;
+}
+
+/* gera o PDF a partir de um conjunto numeração+datas+valores */
+async function gerarPdfLote(lista, val){
+  $("docPdf").innerHTML =
+    lista.map(x => montarPaginaVeic(x.num, x.data, val, !logoDataUrl && logoArquivoOk)).join("");
+  await new Promise(r => setTimeout(r, 80));   // garante a renderização
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({unit:"mm", format:"a4", orientation:"portrait"});
+  const pags = document.querySelectorAll("#docPdf .pagina");
+  let primeiraPag = true;
+  for(const pg of pags){
+    const canvas = await html2canvas(pg, {scale:2, backgroundColor:"#ffffff",
+                                          useCORS:true, allowTaint:false, logging:false});
+    primeiraPag = addCanvasAoPdf(pdf, canvas, primeiraPag);
+  }
+  $("docPdf").innerHTML = "";
+  return pdf;
+}
+
+/* =========================================================
+   BOTÕES — visualizar e baixar PDF (+ salvar no Firebase)
+   ========================================================= */
+ $("btnVeicVer").onclick = () => {
+  const datas = calcularDatasVeic();
+  if(!datas.length){
+    alert($("vUsarDataEsp").checked
+      ? "Informe a data específica."
+      : "Marque ao menos um dia da semana (com ano válido) ou use a data específica.");
+    return;
+  }
+  const val = valoresVeic();
+  const base = veicProxNum();
+  const lista = datas.map((d,i) => ({num: String(base+i).padStart(3,"0"), data: fmtBR(d)}));
+  const css = document.getElementById("cssFolha").textContent;
+  const w = window.open("", "_blank");
+  if(!w){ alert("Permita pop-ups para visualizar o documento."); return; }
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Solicitação de Veículo — Visualização</title><style>
+@page{size:A4;margin:0}
+body{background:#525659;margin:0;padding:24px;display:flex;flex-direction:column;align-items:center;gap:24px}
+ ${css}
+#barraImp{position:fixed;top:12px;right:12px;z-index:99}
+#barraImp button{padding:10px 20px;border:none;border-radius:6px;background:#1a5fb4;color:#fff;
+                 font-size:14px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+#barraImp button:hover{background:#124a8f}
+@media print{
+  body{background:#fff;padding:0;gap:0}
+  #barraImp{display:none}
+  .pagina{box-shadow:none;margin:0}
+  .pagina:not(:last-child){page-break-after:always}
+}
+</style></head><body>
+<div id="barraImp"><button onclick="window.print()">🖨 Imprimir</button></div>
+ ${lista.map(x => montarPaginaVeic(x.num, x.data, val, !logoDataUrl && logoArquivoOk)).join("")}
+</body></html>`);
+  w.document.close();
+};
+
+ $("btnVeicPDF").onclick = async () => {
+  const datas = calcularDatasVeic();
+  if(!datas.length){
+    alert($("vUsarDataEsp").checked
+      ? "Informe a data específica."
+      : "Marque ao menos um dia da semana (com ano válido) ou use a data específica.");
+    return;
+  }
+  const btn = $("btnVeicPDF"), st = $("fbVeic");
+  btn.disabled = true; btn.textContent = "⏳ Gerando PDF...";
+  st.style.opacity = 1; st.style.color = "#1a5fb4"; st.textContent = "⏳ Gerando…";
+  try{
+    const val = valoresVeic();
+    const base = veicProxNum();
+    const lista = datas.map((d,i) => ({num: String(base+i).padStart(3,"0"), data: fmtBR(d), numInt: base+i}));
+    const pdf = await gerarPdfLote(lista, val);
+
+    const primeiro = lista[0].num, ultimo = lista[lista.length-1].num;
+    const nome = primeiro === ultimo ? primeiro : primeiro + "_a_" + ultimo;
+    const url = URL.createObjectURL(pdf.output("blob"));
+    const a = document.createElement("a");
+    a.href = url; a.download = "solicitacao_veiculo_" + nome + ".pdf";
+    a.click(); URL.revokeObjectURL(url);
+
+    /* avança a numeração e salva cada formulário no Firebase */
+    veicSetProxNum(base + lista.length);
+    $("vNum").value = String(veicProxNum()).padStart(3,"0");
+    atualizarPreviaVeic();
+
+    let salvos = 0, erroFB = "";
+    for(const x of lista){
+      try{
+        await salvarSolicitacaoFB(x.num, x.numInt, x.data, val);
+        salvos++;
+      }catch(err){ erroFB = err.message; }
+    }
+    if(!precisaFB()) carregarHistorico();
+
+    if(salvos === lista.length){
+      st.style.color = "#1a7f37";
+      st.textContent = `✔ ${salvos} solicitação(ões) gerada(s) e salva(s) no histórico — próximo nº: ${String(veicProxNum()).padStart(3,"0")}`;
+    }else{
+      st.style.color = "#b3261e";
+      st.textContent = `⚠ PDF gerado, mas ${lista.length - salvos} não salvou no Firebase. ${erroFB}`;
+    }
+  }catch(err){
+    alert("Erro ao gerar o PDF:\n" + err.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "⬇ Baixar PDF (salva no Firebase)";
+    setTimeout(() => st.style.opacity = 0, 6000);
+  }
+};
+
+/* =========================================================
+   REGENERAÇÃO a partir do histórico (não avança numeração)
+   ========================================================= */
+function abrirVisualizacaoDoc(numStr, dataBR, val){
+  const css = document.getElementById("cssFolha").textContent;
+  const w = window.open("", "_blank");
+  if(!w){ alert("Permita pop-ups para visualizar o documento."); return; }
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Solicitação de Veículo Nº ${esc(numStr)} — Visualização</title><style>
+@page{size:A4;margin:0}
+body{background:#525659;margin:0;padding:24px;display:flex;flex-direction:column;align-items:center;gap:24px}
+ ${css}
+#barraImp{position:fixed;top:12px;right:12px;z-index:99}
+#barraImp button{padding:10px 20px;border:none;border-radius:6px;background:#1a5fb4;color:#fff;
+                 font-size:14px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+#barraImp button:hover{background:#124a8f}
+@media print{
+  body{background:#fff;padding:0;gap:0}
+  #barraImp{display:none}
+  .pagina{box-shadow:none;margin:0}
+}
+</style></head><body>
+<div id="barraImp"><button onclick="window.print()">🖨 Imprimir</button></div>
+ ${montarPaginaVeic(numStr, dataBR, val, !logoDataUrl && logoArquivoOk)}
+</body></html>`);
+  w.document.close();
+}
+
+async function gerarPdfDoc(numStr, dataBR, val){
+  const pdf = await gerarPdfLote([{num: numStr, data: dataBR}], val);
+  const url = URL.createObjectURL(pdf.output("blob"));
+  const a = document.createElement("a");
+  a.href = url; a.download = "solicitacao_veiculo_" + numStr + ".pdf";
+  a.click(); URL.revokeObjectURL(url);
+}
+
+initLogo();
+</script>
+</body>
+</html>
